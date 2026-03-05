@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-03-05T20:03:04",
+  "train_mode": "DEV_TRAIN",
+  "backbone": "efficientnet_b0",
+  "img_size": [
+    192,
+    192
+  ],
+  "batch_size": 32,
+  "classes": [
+    "angry",
+    "fear",
+    "happy",
+    "sad",
+    "surprise"
+  ],
+  "profile": {
+    "epochs_stage1": 6,
+    "epochs_stage2": 8,
+    "train_fraction": 0.6,
+    "val_fraction": 1.0,
+    "lr_stage1": 0.001,
+    "lr_stage2": 1e-05,
+    "finetune_layers": 140,
+    "earlystop1": 2,
+    "earlystop2": 4
+  },
+  "mixup_stage1": false,
+  "mixup_stage2": true,
+  "mixup_alpha": 0.1,
+  "use_focal": true,
+  "focal_gamma": 1.5,
+  "lr_schedule": "cosine",
+  "balance_mode": "roundrobin",
+  "data_dir": "C:\\Users\\domvo\\Documents\\GitHub\\FER-Application\\dataset"
+}
