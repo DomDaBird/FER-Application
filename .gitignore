@@ -1,30 +1,86 @@
+# =========================
 # Python
+# =========================
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
 *.pyd
+*.so
 *.egg-info/
 dist/
 build/
 
-# Environments
+# =========================
+# Testing / tooling caches
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.hypothesis/
+
+# =========================
+# Virtual environments
+# =========================
 .venv/
 venv/
+env/
 .env
+.env.*
 
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
 # IDE
+# =========================
 .vscode/
 .idea/
 
+# =========================
 # OS
+# =========================
 .DS_Store
 Thumbs.db
 
-# Outputs / artifacts
-models/*.keras
-reports/*.png
-reports/*.json
-reports/*.txt
+# =========================
+# ML / training artifacts (keep repo small)
+# =========================
+models/
+checkpoints/
+logs/
+runs/
+wandb/
+mlruns/
+lightning_logs/
+*.keras
+*.h5
+*.ckpt
+*.tfevents*
 
-# Data (recommended)
+# If you want to commit exactly one model file later, use:
+# !models/best_model.keras
+
+# =========================
+# Data (full datasets should NOT be versioned)
+# =========================
+dataset/
 data_split/
+data/
+raw_data/
+
+# Keep demo data in repo:
+!demo_data/
+!demo_data/**
+
+# =========================
+# Archives
+# =========================
+*.zip
+*.7z
+*.tar
+*.tar.gz
