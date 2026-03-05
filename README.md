@@ -29,6 +29,11 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+#### Python version
+
+This project is tested with **Python 3.11** on Windows.
+Using Python 3.12/3.13 may cause TensorFlow installation issues on some systems.
+
 ### 2. Run the app
 
 ``` bash
