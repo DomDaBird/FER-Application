@@ -1,19 +1,20 @@
 """
 Evaluation script for the Emotion Recognition project.
 
-Evaluates the best saved model on the test dataset and writes:
+This script evaluates the best saved model on the test dataset and writes:
 - reports/eval/confusion_matrix.png
 - reports/eval/confusion_matrix.csv
 - reports/eval/classification_report.txt
 - reports/eval/metrics.json
 
 Company scenario note:
-Outputs are generated as files so non-technical stakeholders can review
-results, and future maintainers can reproduce and compare runs.
+Outputs are written as files so non-technical stakeholders can review results,
+and future maintainers can reproduce and compare runs.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 from datetime import datetime
 from pathlib import Path
@@ -34,54 +35,74 @@ from sklearn.metrics import (
 import config as cfg
 import data as data_mod
 
+
 # ============================================================
 # Helpers
 # ============================================================
 
-
-def load_model(model_path: Path) -> tf.keras.Model:
-    """Load a saved Keras model with custom layers."""
+def load_saved_model(model_path: Path) -> tf.keras.Model:
+    """This function loads a saved Keras model."""
     if not model_path.exists():
-        raise FileNotFoundError(f"Model not found: {model_path}")
-
-    # Custom objects are auto-registered via @register_keras_serializable in model.py,
-    # so compile=False is enough for inference/evaluation.
+        raise FileNotFoundError(
+            f"Model not found: {model_path}\n"
+            "Train the model first (python train.py) or provide a model file."
+        )
     return tf.keras.models.load_model(model_path, compile=False)
 
 
 def ensure_eval_dir() -> Path:
-    """Create evaluation output directory."""
+    """This function creates and returns the evaluation output directory."""
     out = cfg.REPORTS_DIR / "eval"
     out.mkdir(parents=True, exist_ok=True)
     return out
 
 
-def get_predictions(
-    model: tf.keras.Model, ds: tf.data.Dataset
+def labels_to_int(y_batch: np.ndarray) -> np.ndarray:
+    """
+    This function converts labels to integer class indices.
+
+    It supports:
+    - one-hot labels (shape: [B, C])
+    - sparse integer labels (shape: [B])
+    """
+    y_arr = np.asarray(y_batch)
+
+    if y_arr.ndim == 2:
+        return np.argmax(y_arr, axis=1).astype(int)
+
+    return y_arr.astype(int)
+
+
+def collect_predictions(
+    model: tf.keras.Model,
+    ds: tf.data.Dataset,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Collect y_true and y_pred for an integer-labeled dataset.
+    This function collects predictions for the entire dataset.
 
-    Returns:
-        y_true (N,), y_pred (N,)
+    Returns
+    -------
+    y_true : np.ndarray
+        Ground truth class indices (N,).
+    y_pred : np.ndarray
+        Predicted class indices (N,).
     """
     y_true: List[int] = []
     y_pred: List[int] = []
 
     for x_batch, y_batch in ds:
         probs = model.predict(x_batch, verbose=0)
-        pred = np.argmax(probs, axis=1).astype(int)
+        pred_idx = np.argmax(probs, axis=1).astype(int)
 
-        y_true.extend(np.asarray(y_batch).astype(int).tolist())
-        y_pred.extend(pred.tolist())
+        true_idx = labels_to_int(y_batch)
+        y_true.extend(true_idx.tolist())
+        y_pred.extend(pred_idx.tolist())
 
     return np.array(y_true, dtype=int), np.array(y_pred, dtype=int)
 
 
-def save_confusion_matrix_png(
-    cm: np.ndarray, class_names: List[str], out_path: Path
-) -> None:
-    """Save confusion matrix figure."""
+def save_confusion_matrix_png(cm: np.ndarray, class_names: List[str], out_path: Path) -> None:
+    """This function saves the confusion matrix as a PNG image."""
     fig = plt.figure(figsize=(7, 6))
     plt.imshow(cm, interpolation="nearest")
     plt.title("Confusion Matrix")
@@ -91,14 +112,13 @@ def save_confusion_matrix_png(
     plt.xticks(tick_marks, class_names, rotation=45, ha="right")
     plt.yticks(tick_marks, class_names)
 
-    # annotate
     thresh = cm.max() / 2 if cm.max() > 0 else 0.5
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):
             plt.text(
                 j,
                 i,
-                str(cm[i, j]),
+                str(int(cm[i, j])),
                 horizontalalignment="center",
                 color="white" if cm[i, j] > thresh else "black",
                 fontsize=10,
@@ -111,10 +131,8 @@ def save_confusion_matrix_png(
     plt.close(fig)
 
 
-def save_confusion_matrix_csv(
-    cm: np.ndarray, class_names: List[str], out_path: Path
-) -> None:
-    """Save confusion matrix as CSV with labels."""
+def save_confusion_matrix_csv(cm: np.ndarray, class_names: List[str], out_path: Path) -> None:
+    """This function saves the confusion matrix as a CSV file with labels."""
     header = ",".join(["true/pred"] + class_names)
     lines = [header]
     for i, row in enumerate(cm):
@@ -122,40 +140,45 @@ def save_confusion_matrix_csv(
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def save_text(path: Path, text: str) -> None:
-    path.write_text(text, encoding="utf-8")
-
-
 # ============================================================
 # Main
 # ============================================================
 
-
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Evaluate the emotion recognition model.")
+    parser.add_argument(
+        "--data_dir",
+        type=str,
+        default=str(cfg.DATA_DIR),
+        help="Path to dataset root (contains train/val/test).",
+    )
+    parser.add_argument(
+        "--model_path",
+        type=str,
+        default=str(cfg.MODELS_DIR / cfg.BEST_MODEL_NAME),
+        help="Path to the saved model (.keras).",
+    )
+    args = parser.parse_args()
+
     cfg.ensure_project_dirs()
     cfg.set_global_seed(cfg.SEED)
 
     eval_dir = ensure_eval_dir()
 
-    model_path = cfg.MODELS_DIR / cfg.BEST_MODEL_NAME
-    model = load_model(model_path)
+    data_root = Path(args.data_dir)
+    model_path = Path(args.model_path)
 
-    # Build datasets (we only need test, but bundle keeps class order consistent)
-    bundle = data_mod.build_datasets(class_names=cfg.ACTIVE_CLASSES, seed=cfg.SEED)
-    class_names = bundle.class_names
+    model = load_saved_model(model_path)
 
-    # Predict
-    y_true, y_pred = get_predictions(model, bundle.test)
+    # Build datasets and use test only (keeps class order consistent)
+    _train_ds, _val_ds, test_ds, class_names = data_mod.make_datasets(data_root)
 
-    # Metrics
+    y_true, y_pred = collect_predictions(model, test_ds)
+
     metrics: Dict[str, float] = {
         "accuracy": float(accuracy_score(y_true, y_pred)),
-        "precision_macro": float(
-            precision_score(y_true, y_pred, average="macro", zero_division=0)
-        ),
-        "recall_macro": float(
-            recall_score(y_true, y_pred, average="macro", zero_division=0)
-        ),
+        "precision_macro": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
+        "recall_macro": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
         "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
         "precision_weighted": float(
             precision_score(y_true, y_pred, average="weighted", zero_division=0)
@@ -168,10 +191,8 @@ def main() -> None:
         ),
     }
 
-    # Confusion matrix
     cm = confusion_matrix(y_true, y_pred, labels=list(range(len(class_names))))
 
-    # Classification report
     report = classification_report(
         y_true,
         y_pred,
@@ -180,28 +201,26 @@ def main() -> None:
         zero_division=0,
     )
 
-    # Write outputs
-    save_text(eval_dir / "classification_report.txt", report)
-
+    (eval_dir / "classification_report.txt").write_text(report, encoding="utf-8")
     save_confusion_matrix_png(cm, class_names, eval_dir / "confusion_matrix.png")
     save_confusion_matrix_csv(cm, class_names, eval_dir / "confusion_matrix.csv")
 
     meta = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
         "model_path": str(model_path),
+        "data_dir": str(data_root),
         "classes": class_names,
         "num_samples": int(len(y_true)),
         "metrics": metrics,
     }
     (eval_dir / "metrics.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
-    # Console summary (for quick verification)
     print("\nEVALUATION DONE")
     print(f"Model: {model_path}")
     print(f"Samples: {len(y_true)}")
     print(f"Accuracy: {metrics['accuracy']:.4f}")
     print(f"F1 macro:  {metrics['f1_macro']:.4f}")
-    print(f"Saved:")
+    print("Saved outputs:")
     print(f" - {eval_dir / 'confusion_matrix.png'}")
     print(f" - {eval_dir / 'confusion_matrix.csv'}")
     print(f" - {eval_dir / 'classification_report.txt'}")
