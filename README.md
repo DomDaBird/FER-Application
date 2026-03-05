@@ -1,133 +1,117 @@
-# AI Facial Emotion Recognition Application via Streamlit
+# Facial Emotion Recognition (FER) -- EfficientNetB0
 
-This project implements a deep learning–based facial emotion recognition system using transfer learning with EfficientNetB0.  
-The application classifies facial images into five emotion categories:
+A student project for IU course **Artificial Intelligence
+(DLBDSEAIS02)** (Task 3: Emotion Detection in Images).
 
-- angry  
-- fear  
-- happy  
-- sad  
-- surprise  
+The system detects facial emotions in images using transfer learning
+with **EfficientNetB0** and classifies images into:
 
-The system includes:
-- A Streamlit-based user interface (prediction + quiz mode)
-- A training pipeline
-- An evaluation pipeline
-- Reproducible configuration and documentation
+-   Angry
+-   Fear
+-   Happy
+-   Sad
+-   Surprise
 
----
+This repository is written so that non-developers (e.g., a marketing
+team) can run a quick demo and understand what the system does.
 
-## Features
+------------------------------------------------------------------------
 
-- Single image emotion prediction
-- Interactive quiz mode
-- Transfer learning with EfficientNetB0
-- Confusion matrix and classification report
-- Configuration-driven architecture
-- Fully reproducible environment
+## 1) Quick Demo (Streamlit)
 
----
+### 1. Install
 
-## Quickstart (Demo Mode)
-
-### 1️⃣ Clone repository
-
-```powershell
-git clone https://github.com/DomDaBird/IU_Projekte.git
-cd IU_Projekte/emotion-recognition
-```
-
-### 2️⃣ Create virtual environment
-
-```powershell
+``` bash
 python -m venv .venv
-.\.venv\Scripts\activate
+# Windows:
+.venv\Scripts\activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3️⃣ Start the application
+### 2. Run the app
 
-```powershell
+``` bash
 streamlit run app_streamlit.py
 ```
 
-Open in browser:
-```
-http://localhost:8501
-```
+### 3. Test with demo images
 
----
+A small set of demo images is provided in:
 
-## Training (Optional)
+`demo_data/`
 
-```powershell
+Use the Streamlit uploader and try a few images from each emotion
+folder.
+
+------------------------------------------------------------------------
+
+## 2) Project Structure (Short)
+
+Core scripts:
+
+-   `train.py` -- model training pipeline
+-   `evaluate.py` -- evaluation on the test set (metrics + confusion
+    matrix)
+-   `infer_single.py` -- inference for a single image via command line
+-   `app_streamlit.py` -- Streamlit web demo
+-   `data.py` -- tf.data input pipeline (train/val/test)
+-   `model.py` -- EfficientNetB0 transfer learning model
+-   `config.py` -- configuration (paths, hyperparameters)
+
+Outputs:
+
+-   `reports/` -- evaluation results (e.g., confusion matrix,
+    classification report)
+
+Documentation:
+
+-   `docs/` -- installation and usage guides
+
+------------------------------------------------------------------------
+
+## 3) Training & Evaluation (Developer Workflow)
+
+### Dataset folder structure
+
+dataset/ train/ angry/ fear/ happy/ sad/ surprise/ val/ angry/ fear/
+happy/ sad/ surprise/ test/ angry/ fear/ happy/ sad/ surprise/
+
+Note: The full Kaggle dataset is not included in this repository.
+
+### Train
+
+``` bash
 python train.py
 ```
 
-The best model will be saved in:
+### Evaluate
 
-```
-models/best_model.keras
-```
-
----
-
-## Evaluation (Optional)
-
-```powershell
+``` bash
 python evaluate.py
 ```
 
-Evaluation outputs:
-- reports/confusion_matrix.png
-- reports/classification_report.txt
-- reports/training_logs.json
+### Inference (single image)
 
----
-
-## Repository Structure
-
-```
-emotion-recognition/
-│
-├─ app_streamlit.py
-├─ train.py
-├─ evaluate.py
-├─ infer_single.py
-├─ config.py
-├─ model.py
-├─ data.py
-│
-├─ models/
-│   └─ best_model.keras
-│
-├─ reports/
-│
-├─ data_split/
-│   ├─ train/
-│   ├─ val/
-│   └─ test/
-│
-├─ docs/
-│   ├─ USER_GUIDE.md
-│   └─ TECHNICAL_OVERVIEW.md
-│
-└─ requirements.txt
+``` bash
+python infer_single.py --image "path/to/image.jpg"
 ```
 
----
+------------------------------------------------------------------------
 
-## Reproducibility & Maintainability
+## 4) Documentation
 
-- Central configuration via config.py
-- Dependencies defined in requirements.txt
-- Version controlled using Git
-- Clear separation of training, evaluation, and application logic
-- Modular architecture for future extension
+For detailed instructions, see:
 
----
+-   `docs/INSTALLATION.md`
+-   `docs/USAGE_STREAMLIT.md`
+-   `docs/TRAINING.md`
+-   `docs/EVALUATION.md`
+-   `docs/ARCHITECTURE.md`
 
-## Scenario Context
+------------------------------------------------------------------------
 
-This system was developed in a simulated company scenario where a marketing department requested a deployable and documented emotion recognition application.  
-The repository structure and documentation are designed to support future maintenance and extension within a configuration management system.
+## 5) License / Disclaimer
+
+This is a university project. The model predictions are for
+demonstration and learning purposes.
