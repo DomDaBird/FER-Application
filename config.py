@@ -21,24 +21,30 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Literal
 
+
 # ============================================================
 # Project paths
 # ============================================================
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent
 
-DATA_DIR: Path = PROJECT_ROOT / "data_split"  # must contain train/val/test
+# Dataset must contain train/val/test with class subfolders.
+# This name matches the documentation in README and docs/*.
+DATA_DIR: Path = PROJECT_ROOT / "dataset"
+
 MODELS_DIR: Path = PROJECT_ROOT / "models"
 REPORTS_DIR: Path = PROJECT_ROOT / "reports"
 CACHE_DIR: Path = PROJECT_ROOT / ".cache"
 
 BEST_MODEL_NAME: str = "best_model.keras"
 
+
 # ============================================================
 # Reproducibility
 # ============================================================
 
 SEED: int = 42
+
 
 # ============================================================
 # Class definitions (order matters!)
@@ -54,17 +60,18 @@ ALIASES: Dict[str, set[str]] = {
     "surprise": {"surprise", "surprised"},
 }
 
+
 # ============================================================
 # Model parameters
 # ============================================================
 
 BackboneName = Literal["mobilenet_v2", "efficientnet_b0"]
-
 BACKBONE: BackboneName = "efficientnet_b0"
 
 # TensorFlow/Keras uses (H, W); PIL uses (W, H)
-IMG_SIZE = (192, 192)
-PIL_SIZE = (IMG_SIZE[1], IMG_SIZE[0])
+IMG_SIZE: tuple[int, int] = (192, 192)
+PIL_SIZE: tuple[int, int] = (IMG_SIZE[1], IMG_SIZE[0])
+
 
 # ============================================================
 # Data pipeline
@@ -77,8 +84,9 @@ SHUFFLE_BUFFER_SIZE: int = 2048
 # "roundrobin" = balanced training sampling, "none" = natural distribution
 BALANCE_MODE: Literal["roundrobin", "none"] = "roundrobin"
 
+
 # ============================================================
-# Augmentation (if used in your pipeline)
+# Augmentation (if used in the pipeline)
 # ============================================================
 
 USE_AUG: bool = True
@@ -88,6 +96,7 @@ AUG_TRANS: float = 0.08
 AUG_FLIP: bool = True
 COLOR_JITTER: bool = True
 
+
 # ============================================================
 # Head + loss settings
 # ============================================================
@@ -96,6 +105,7 @@ DROP_RATE: float = 0.25
 
 USE_FOCAL: bool = True
 FOCAL_GAMMA: float = 1.5
+
 
 # ============================================================
 # MixUp
@@ -108,6 +118,7 @@ MIXUP_ALPHA: float = 0.1
 LABEL_SMOOTH_STAGE1: float = 0.0
 LABEL_SMOOTH_STAGE2: float = 0.0
 
+
 # ============================================================
 # Training profiles
 # ============================================================
@@ -117,6 +128,8 @@ TrainMode = Literal["FAST_DEBUG", "DEV_TRAIN", "FULL_TRAIN"]
 
 @dataclass(frozen=True)
 class TrainProfile:
+    """This dataclass stores training hyperparameters for a training mode."""
+
     epochs_stage1: int
     epochs_stage2: int
     train_fraction: float
@@ -184,12 +197,12 @@ EARLYSTOP_STAGE2_PATIENCE: int = _ACTIVE_PROFILE.earlystop2
 
 FAST_TRAIN: bool = TRAIN_MODE != "FULL_TRAIN"
 
+
 # ============================================================
 # Learning rate schedule
 # ============================================================
 
 LrSchedule = Literal["cosine", "plateau"]
-
 LR_SCHEDULE: LrSchedule = "cosine"
 
 ROP_FACTOR: float = 0.5
@@ -197,23 +210,20 @@ ROP_PATIENCE: int = 2 if FAST_TRAIN else 3
 ROP_MIN_LR: float = 1e-7
 ROP_MIN_DELTA: float = 1e-4
 
+
 # ============================================================
 # Helpers (used by other scripts)
 # ============================================================
 
-
 def ensure_project_dirs() -> None:
-    """Create required directories if they do not exist."""
+    """This function creates required directories if they do not exist."""
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def validate_config() -> None:
-    """
-    Validate critical configuration values early.
-    This helps future maintainers and prevents silent misconfiguration.
-    """
+    """This function validates critical configuration values early."""
     if BACKBONE not in ("mobilenet_v2", "efficientnet_b0"):
         raise ValueError(
             f"Invalid BACKBONE='{BACKBONE}'. Use 'mobilenet_v2' or 'efficientnet_b0'."
@@ -236,7 +246,7 @@ def validate_config() -> None:
 
 
 def set_global_seed(seed: int = SEED) -> None:
-    """Set Python/NumPy/TensorFlow seeds for reproducibility."""
+    """This function sets Python/NumPy/TensorFlow seeds for reproducibility."""
     import os
     import random
 
@@ -248,6 +258,7 @@ def set_global_seed(seed: int = SEED) -> None:
 
         np.random.seed(seed)
     except Exception:
+        # NumPy is optional for some workflows.
         pass
 
     try:
@@ -255,8 +266,9 @@ def set_global_seed(seed: int = SEED) -> None:
 
         tf.random.set_seed(seed)
     except Exception:
+        # TensorFlow might not be available in minimal environments.
         pass
 
 
-# Validate once on import (safe, fast)
+# Validate once on import (safe and fast)
 validate_config()
