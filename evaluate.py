@@ -1,14 +1,14 @@
 """
 Evaluation script for the Emotion Recognition project.
 
-This script evaluates the best saved model on the test dataset and writes:
+This script evaluates the saved model on the test dataset and writes:
 - reports/eval/confusion_matrix.png
 - reports/eval/confusion_matrix.csv
 - reports/eval/classification_report.txt
 - reports/eval/metrics.json
 
 Company scenario note:
-Outputs are written as files so non-technical stakeholders can review results,
+Outputs are written as files so that non-technical stakeholders can review results,
 and future maintainers can reproduce and compare runs.
 """
 
@@ -34,6 +34,7 @@ from sklearn.metrics import (
 
 import config as cfg
 import data as data_mod
+import model as model_def
 
 
 # ============================================================
@@ -41,13 +42,25 @@ import data as data_mod
 # ============================================================
 
 def load_saved_model(model_path: Path) -> tf.keras.Model:
-    """This function loads a saved Keras model."""
+    """
+    This function loads a saved Keras model.
+
+    The custom preprocessing layer is explicitly passed to ensure
+    reliable deserialization across scripts.
+    """
     if not model_path.exists():
         raise FileNotFoundError(
             f"Model not found: {model_path}\n"
             "Train the model first (python train.py) or provide a model file."
         )
-    return tf.keras.models.load_model(model_path, compile=False)
+
+    return tf.keras.models.load_model(
+        model_path,
+        compile=False,
+        custom_objects={
+            "BackbonePreprocess": model_def.BackbonePreprocess,
+        },
+    )
 
 
 def ensure_eval_dir() -> Path:
@@ -62,8 +75,8 @@ def labels_to_int(y_batch: np.ndarray) -> np.ndarray:
     This function converts labels to integer class indices.
 
     It supports:
-    - one-hot labels (shape: [B, C])
-    - sparse integer labels (shape: [B])
+    - one-hot labels with shape (B, C)
+    - sparse integer labels with shape (B,)
     """
     y_arr = np.asarray(y_batch)
 
@@ -83,9 +96,9 @@ def collect_predictions(
     Returns
     -------
     y_true : np.ndarray
-        Ground truth class indices (N,).
+        Ground truth class indices.
     y_pred : np.ndarray
-        Predicted class indices (N,).
+        Predicted class indices.
     """
     y_true: List[int] = []
     y_pred: List[int] = []
@@ -101,7 +114,11 @@ def collect_predictions(
     return np.array(y_true, dtype=int), np.array(y_pred, dtype=int)
 
 
-def save_confusion_matrix_png(cm: np.ndarray, class_names: List[str], out_path: Path) -> None:
+def save_confusion_matrix_png(
+    cm: np.ndarray,
+    class_names: List[str],
+    out_path: Path,
+) -> None:
     """This function saves the confusion matrix as a PNG image."""
     fig = plt.figure(figsize=(7, 6))
     plt.imshow(cm, interpolation="nearest")
@@ -131,12 +148,18 @@ def save_confusion_matrix_png(cm: np.ndarray, class_names: List[str], out_path: 
     plt.close(fig)
 
 
-def save_confusion_matrix_csv(cm: np.ndarray, class_names: List[str], out_path: Path) -> None:
-    """This function saves the confusion matrix as a CSV file with labels."""
+def save_confusion_matrix_csv(
+    cm: np.ndarray,
+    class_names: List[str],
+    out_path: Path,
+) -> None:
+    """This function saves the confusion matrix as a CSV file."""
     header = ",".join(["true/pred"] + class_names)
     lines = [header]
+
     for i, row in enumerate(cm):
         lines.append(",".join([class_names[i]] + [str(int(v)) for v in row]))
+
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
@@ -170,16 +193,21 @@ def main() -> None:
 
     model = load_saved_model(model_path)
 
-    # Build datasets and use test only (keeps class order consistent)
     _train_ds, _val_ds, test_ds, class_names = data_mod.make_datasets(data_root)
 
     y_true, y_pred = collect_predictions(model, test_ds)
 
     metrics: Dict[str, float] = {
         "accuracy": float(accuracy_score(y_true, y_pred)),
-        "precision_macro": float(precision_score(y_true, y_pred, average="macro", zero_division=0)),
-        "recall_macro": float(recall_score(y_true, y_pred, average="macro", zero_division=0)),
-        "f1_macro": float(f1_score(y_true, y_pred, average="macro", zero_division=0)),
+        "precision_macro": float(
+            precision_score(y_true, y_pred, average="macro", zero_division=0)
+        ),
+        "recall_macro": float(
+            recall_score(y_true, y_pred, average="macro", zero_division=0)
+        ),
+        "f1_macro": float(
+            f1_score(y_true, y_pred, average="macro", zero_division=0)
+        ),
         "precision_weighted": float(
             precision_score(y_true, y_pred, average="weighted", zero_division=0)
         ),
@@ -213,7 +241,10 @@ def main() -> None:
         "num_samples": int(len(y_true)),
         "metrics": metrics,
     }
-    (eval_dir / "metrics.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    (eval_dir / "metrics.json").write_text(
+        json.dumps(meta, indent=2),
+        encoding="utf-8",
+    )
 
     print("\nEVALUATION DONE")
     print(f"Model: {model_path}")

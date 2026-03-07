@@ -23,7 +23,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Tuple
+from typing import Dict
 
 import tensorflow as tf
 
@@ -75,7 +75,7 @@ def ensure_one_hot(ds: tf.data.Dataset, num_classes: int) -> tf.data.Dataset:
     This function ensures that labels are one-hot encoded.
 
     If labels are already one-hot, they are cast to float32.
-    If labels are sparse integers, they are converted to one-hot.
+    If labels are sparse integer labels, they are converted to one-hot.
     """
 
     def _map(x, y):
@@ -90,25 +90,31 @@ def ensure_one_hot(ds: tf.data.Dataset, num_classes: int) -> tf.data.Dataset:
 
 def apply_mixup(ds: tf.data.Dataset, alpha: float, seed: int) -> tf.data.Dataset:
     """
-    This function applies MixUp on an already-batched (x, y_onehot) dataset.
+    This function applies MixUp to an already batched dataset.
 
-    The implementation uses a Beta(alpha, alpha) distribution approximated via
-    two Gamma samples (standard trick), which is stable without extra dependencies.
+    The lambda value is sampled from a Beta(alpha, alpha) distribution
+    using two Gamma samples.
+
+    Notes
+    -----
+    - Inputs are expected as batches of (x, y_onehot).
+    - The function returns uint8 images to stay compatible with the
+      model preprocessing layer.
     """
     if alpha <= 0:
-        raise ValueError("MixUp alpha must be > 0")
-
-    rng = tf.random.Generator.from_seed(seed)
+        raise ValueError("MixUp alpha must be > 0.")
 
     def _mix(x, y):
         batch_size = tf.shape(x)[0]
 
-        g1 = rng.gamma(shape=[], alpha=alpha, beta=1.0)
-        g2 = rng.gamma(shape=[], alpha=alpha, beta=1.0)
+        # Sample lambda ~ Beta(alpha, alpha) via Gamma(alpha, 1)
+        g1 = tf.random.gamma(shape=[], alpha=alpha, beta=1.0, seed=seed)
+        g2 = tf.random.gamma(shape=[], alpha=alpha, beta=1.0, seed=seed + 1)
         lam = g1 / (g1 + g2 + 1e-7)
         lam = tf.cast(lam, tf.float32)
 
         idx = tf.random.shuffle(tf.range(batch_size), seed=seed)
+
         x2 = tf.gather(x, idx)
         y2 = tf.gather(y, idx)
 
@@ -266,7 +272,11 @@ def train_stage(
         label_smoothing=label_smoothing,
     )
 
-    callbacks = make_callbacks(stage=stage, out_dir=out_dir, checkpoint_path=checkpoint_path)
+    callbacks = make_callbacks(
+        stage=stage,
+        out_dir=out_dir,
+        checkpoint_path=checkpoint_path,
+    )
 
     history = model.fit(
         train_ds,
@@ -341,32 +351,25 @@ def main() -> None:
 
     data_root = Path(args.data_dir)
 
-    # Build datasets (already batched)
     train_ds, val_ds, _test_ds, class_names = data_mod.make_datasets(data_root)
     num_classes = len(class_names)
 
-    # Optional: laptop-friendly fractions per profile
     train_ds = limit_dataset_fraction(train_ds, profile.train_fraction)
     val_ds = limit_dataset_fraction(val_ds, profile.val_fraction)
 
-    # Ensure one-hot (required for focal loss, label smoothing, mixup)
     train_ds = ensure_one_hot(train_ds, num_classes)
     val_ds = ensure_one_hot(val_ds, num_classes)
 
-    # Output folders
     train_out = cfg.REPORTS_DIR / "train"
     train_out.mkdir(parents=True, exist_ok=True)
 
-    # Save run metadata
     metadata = build_run_metadata(mode)
     (train_out / "run_config.json").write_text(
         json.dumps(metadata, indent=2), encoding="utf-8"
     )
 
-    # Create model
     model = model_mod.build_model(num_classes=num_classes, img_size=cfg.IMG_SIZE)
 
-    # Checkpoint path (local artifact)
     ckpt_path = Path(args.model_out)
     ckpt_path.parent.mkdir(parents=True, exist_ok=True)
 
